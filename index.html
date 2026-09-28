@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shoplite | Cửa hàng sách</title>
+    <meta
+      name="description"
+      content="Shoplite - Cửa hàng sách trực tuyến với hàng trăm đầu sách hay, mới nhất và ưu đãi hấp dẫn."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <div class="brand">
+          <span class="brand-mark">S</span>
+          <span>Shoplite</span>
+        </div>
+
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="#home">Trang chủ</a>
+          <a href="#featured">Nổi bật</a>
+          <a href="#catalog">Sản phẩm</a>
+          <a href="#about">Về chúng tôi</a>
+          <a href="#contact">Liên hệ</a>
+        </nav>
+
+        <div class="header-actions">
+          <button class="icon-button" aria-label="Tìm kiếm">⌕</button>
+          <button class="cart-button" aria-label="Giỏ hàng">
+            Giỏ hàng
+            <span id="cart-count" class="cart-count">0</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="home">
+      <section class="hero">
+        <div class="container hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">Mỗi cuốn sách là một hành trình mới</p>
+            <h1>Khám phá những đầu sách yêu thích cho mọi lứa tuổi.</h1>
+            <p class="hero-text">
+              Nơi bạn tìm thấy những tác phẩm văn học, kỹ năng sống, kinh doanh,
+              thiếu nhi và sách giáo dục chất lượng với giá ưu đãi mỗi ngày.
+            </p>
+            <div class="hero-actions">
+              <a href="#catalog" class="btn btn-primary">Mua ngay</a>
+              <a href="#featured" class="btn btn-secondary">Xem nổi bật</a>
+            </div>
+            <ul class="stats">
+              <li><strong>25k+</strong><span>Khách hàng</span></li>
+              <li><strong>1.8k+</strong><span>Đầu sách</span></li>
+              <li><strong>4.9/5</strong><span>Đánh giá</span></li>
+            </ul>
+          </div>
+
+          <div class="hero-visual" aria-label="Sách nổi bật">
+            <div class="book-stack">
+              <article class="book-card book-card-large">
+                <span class="tag">Bán chạy</span>
+                <h3>Đừng Ngại Sống</h3>
+                <p>by Nguyễn Nhật Ánh</p>
+                <div class="price-row">
+                  <strong>189.000đ</strong>
+                  <span>249.000đ</span>
+                </div>
+              </article>
+              <article class="book-card book-card-small">
+                <span class="tag">Mới</span>
+                <h3>Siêu trí nhớ</h3>
+                <p>by David</p>
+                <div class="price-row">
+                  <strong>160.000đ</strong>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="category-strip" aria-label="Danh mục sách">
+        <div class="container categories">
+          <button class="category active" data-category="all">Tất cả</button>
+          <button class="category" data-category="van-hoc">Văn học</button>
+          <button class="category" data-category="kinh-doanh">Kinh doanh</button>
+          <button class="category" data-category="giao-duc">Giáo dục</button>
+          <button class="category" data-category="thieu-nhi">Thiếu nhi</button>
+          <button class="category" data-category="ky-nang">Kỹ năng</button>
+        </div>
+      </section>
+
+      <section id="featured" class="section">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Nổi bật</p>
+            <h2>Top sách được yêu thích</h2>
+          </div>
+
+          <div id="featured-books" class="product-grid"></div>
+        </div>
+      </section>
+
+      <section id="catalog" class="section alt-bg">
+        <div class="container">
+          <div class="section-heading row-heading">
+            <div>
+              <p class="eyebrow">Danh mục</p>
+              <h2>Khám phá bộ sưu tập</h2>
+            </div>
+            <div class="sort-box">
+              <label for="sortSelect">Sắp xếp:</label>
+              <select id="sortSelect">
+                <option value="featured">Nổi bật</option>
+                <option value="price-asc">Giá tăng dần</option>
+                <option value="price-desc">Giá giảm dần</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="product-list" class="product-grid" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section id="about" class="section">
+        <div class="container values-grid">
+          <div class="value-card">
+            <div class="icon">🚚</div>
+            <h3>Giao hàng nhanh</h3>
+            <p>Miễn phí vận chuyển cho đơn hàng từ 300.000đ.</p>
+          </div>
+          <div class="value-card">
+            <div class="icon">📚</div>
+            <h3>Sách chính hãng</h3>
+            <p>Chúng tôi lựa chọn nguồn sách uy tín và chất lượng.</p>
+          </div>
+          <div class="value-card">
+            <div class="icon">💬</div>
+            <h3>Hỗ trợ tận tâm</h3>
+            <p>Đội ngũ tư vấn sẵn sàng giúp bạn chọn sách phù hợp.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section testimonial-section">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Khách hàng nói gì</p>
+            <h2>Đánh giá từ cộng đồng đọc giả</h2>
+          </div>
+
+          <div class="testimonial-grid">
+            <article class="testimonial">
+              <div class="stars">★★★★★</div>
+              <p>
+                “Shoplite có rất nhiều đầu sách hay, giao hàng nhanh và rất chuyên
+                nghiệp. Tôi luôn đặt hàng ở đây.”
+              </p>
+              <strong>Minh Anh</strong>
+            </article>
+            <article class="testimonial">
+              <div class="stars">★★★★★</div>
+              <p>
+                “Giao diện dễ dùng, ưu đãi hợp lý, và sách rất đáng mua. Cực kỳ đáng
+                tin cậy.”
+              </p>
+              <strong>Huyền Trang</strong>
+            </article>
+            <article class="testimonial">
+              <div class="stars">★★★★★</div>
+              <p>
+                “Tôi hay mua sách cho con, Shoplite có nhiều bộ sách thiếu nhi đẹp và
+                phù hợp lứa tuổi.”
+              </p>
+              <strong>Quang Nam</strong>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer id="contact" class="site-footer">
+      <div class="container footer-grid">
+        <div>
+          <div class="brand footer-brand">
+            <span class="brand-mark">S</span>
+            <span>Shoplite</span>
+          </div>
+          <p>Cửa hàng sách trực tuyến dành cho người yêu văn hóa đọc.</p>
+        </div>
+
+        <div>
+          <h4>Liên hệ</h4>
+          <ul>
+            <li>📍 123 Nguyễn Huệ, Q.1, TP.HCM</li>
+            <li>📞 0909 123 456</li>
+            <li>✉️ hello@shoplite.vn</li>
+          </ul>
+        </div>
+
+        <div>
+          <h4>Giờ mở cửa</h4>
+          <ul>
+            <li>Thứ 2 - Thứ 6: 8:00 - 20:00</li>
+            <li>Thứ 7: 9:00 - 18:00</li>
+            <li>Chủ nhật: Nghỉ</li>
+          </ul>
+        </div>
+      </div>
+      <div class="container footer-bottom">
+        <p>© 2026 Shoplite. Bảo lưu mọi quyền.</p>
+      </div>
+    </footer>
+
+    <aside id="cart-panel" class="cart-panel" aria-label="Giỏ hàng">
+      <div class="cart-header">
+        <h3>Giỏ hàng</h3>
+        <button id="close-cart" class="close-cart" aria-label="Đóng giỏ hàng">×</button>
+      </div>
+      <div id="cart-items" class="cart-items"></div>
+      <div class="cart-footer">
+        <div class="total-row">
+          <span>Tổng cộng</span>
+          <strong id="cart-total">0đ</strong>
+        </div>
+        <button id="checkout-button" class="btn btn-primary full-width" type="button">
+          Thanh toán
+        </button>
+      </div>
+    </aside>
+
+    <div id="checkout-modal" class="modal-backdrop" aria-hidden="true">
+      <section class="checkout-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
+        <div class="checkout-header">
+          <div>
+            <p class="eyebrow">Hoàn tất đơn hàng</p>
+            <h2 id="checkout-title">Thông tin thanh toán</h2>
+          </div>
+          <button id="close-checkout" class="close-cart" type="button" aria-label="Đóng thanh toán">×</button>
+        </div>
+
+        <form id="checkout-form" class="checkout-form">
+          <div class="checkout-fields">
+            <label>
+              Họ và tên
+              <input name="fullName" type="text" autocomplete="name" placeholder="Nguyễn Văn An" required />
+            </label>
+            <label>
+              Số điện thoại
+              <input name="phone" type="tel" autocomplete="tel" placeholder="0909 123 456" pattern="[0-9 ]{10,12}" required />
+            </label>
+            <label class="field-wide">
+              Địa chỉ nhận hàng
+              <input name="address" type="text" autocomplete="street-address" placeholder="Số nhà, đường, phường/xã, tỉnh/thành" required />
+            </label>
+          </div>
+
+          <fieldset>
+            <legend>Phương thức thanh toán</legend>
+            <label class="payment-option">
+              <input type="radio" name="payment" value="cod" checked />
+              <span><strong>Thanh toán khi nhận hàng</strong><small>Kiểm tra sách trước khi thanh toán</small></span>
+            </label>
+            <label class="payment-option">
+              <input type="radio" name="payment" value="bank" />
+              <span><strong>Chuyển khoản ngân hàng</strong><small>Thông tin chuyển khoản hiển thị sau khi đặt hàng</small></span>
+            </label>
+          </fieldset>
+
+          <div class="checkout-summary">
+            <span>Tạm tính</span><strong id="checkout-subtotal">0đ</strong>
+            <span>Phí vận chuyển</span><strong id="checkout-shipping">0đ</strong>
+            <span class="summary-total">Tổng thanh toán</span><strong id="checkout-total" class="summary-total">0đ</strong>
+          </div>
+          <p id="checkout-message" class="checkout-message" role="status"></p>
+          <button class="btn btn-primary full-width" type="submit">Xác nhận đặt hàng</button>
+        </form>
+      </section>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
