@@ -271,7 +271,7 @@
             </label>
             <label class="payment-option">
               <input type="radio" name="payment" value="bank" />
-              <span><strong>Chuyển khoản ngân hàng</strong><small>Thông tin chuyển khoản hiển thị sau khi đặt hàng</small></span>
+              <span><strong>Chuyển khoản bằng QR</strong><small>Quét mã VietQR trong ứng dụng ngân hàng của bạn</small></span>
             </label>
           </fieldset>
 
@@ -280,9 +280,28 @@
             <span>Phí vận chuyển</span><strong id="checkout-shipping">0đ</strong>
             <span class="summary-total">Tổng thanh toán</span><strong id="checkout-total" class="summary-total">0đ</strong>
           </div>
+          <section id="bank-transfer-instructions" class="bank-transfer-instructions" hidden aria-live="polite">
+            <h3>Quét mã để chuyển khoản</h3>
+            <img id="bank-transfer-qr" alt="Mã QR chuyển khoản ngân hàng" />
+            <dl>
+              <dt>Ngân hàng</dt><dd id="bank-transfer-bank"></dd>
+              <dt>Chủ tài khoản</dt><dd id="bank-transfer-name"></dd>
+              <dt>Số tài khoản</dt><dd id="bank-transfer-account"></dd>
+              <dt>Số tiền</dt><dd id="bank-transfer-amount"></dd>
+              <dt>Nội dung</dt><dd id="bank-transfer-reference"></dd>
+            </dl>
+            <p>Đơn đang chờ cửa hàng kiểm tra giao dịch. Shoplite chưa tự động xác nhận thanh toán; vui lòng giữ lại mã đơn để đối soát.</p>
+          </section>
           <p id="checkout-message" class="checkout-message" role="status"></p>
           <button class="btn btn-primary full-width" type="submit">Xác nhận đặt hàng</button>
         </form>
+        <section id="checkout-success" class="checkout-success" hidden aria-live="polite">
+          <div class="success-mark" aria-hidden="true">✓</div>
+          <h3>Đặt hàng thành công</h3>
+          <p>Shoplite đã tiếp nhận đơn hàng của bạn.</p>
+          <p>Mã đơn hàng: <strong id="success-order-code"></strong></p>
+          <button id="success-close" class="btn btn-primary full-width" type="button">Tiếp tục mua sắm</button>
+        </section>
       </section>
     </div>
 

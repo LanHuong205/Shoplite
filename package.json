@@ -1,0 +1,27 @@
+{
+  "name": "shoplite",
+  "version": "1.0.0",
+  "description": "cửa hàng \r HELO",
+  "main": "script.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LanHuong205/Shoplite.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/LanHuong205/Shoplite/issues"
+  },
+  "homepage": "https://github.com/LanHuong205/Shoplite#readme",
+  "dependencies": {
+    "hono": "^4.13.10"
+  },
+  "devDependencies": {
+    "wrangler": "^4.143.0"
+  }
+}

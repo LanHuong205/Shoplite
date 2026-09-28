@@ -102,6 +102,10 @@ const checkoutMessage = document.getElementById("checkout-message");
 const checkoutButton = document.getElementById("checkout-button");
 const sortSelect = document.getElementById("sortSelect");
 const categoryButtons = document.querySelectorAll(".category");
+const bankTransferInstructions = document.getElementById("bank-transfer-instructions");
+const checkoutSuccess = document.getElementById("checkout-success");
+const bankPaymentOption = checkoutForm.querySelector('input[name="payment"][value="bank"]');
+const codPaymentOption = checkoutForm.querySelector('input[name="payment"][value="cod"]');
 
 let selectedCategory = "all";
 
@@ -274,6 +278,13 @@ function openCheckout() {
   }
 
   checkoutMessage.textContent = "";
+  checkoutMessage.classList.remove("success");
+  bankTransferInstructions.hidden = true;
+  checkoutSuccess.hidden = true;
+  checkoutForm.hidden = false;
+  checkoutForm.querySelector('button[type="submit"]').disabled = false;
+  checkoutForm.querySelector('button[type="submit"]').textContent = "Xác nhận đặt hàng";
+  codPaymentOption.checked = true;
   renderCheckoutSummary();
   cartPanel.classList.remove("open");
   checkoutModal.classList.add("open");
@@ -285,6 +296,54 @@ function closeCheckout() {
   checkoutModal.classList.remove("open");
   checkoutModal.setAttribute("aria-hidden", "true");
 }
+
+async function createBankTransferQr() {
+  if (!cart.length) return;
+
+  const { total } = getCartTotals();
+  const orderCode = `SL${Date.now().toString().slice(-6)}`;
+  const submitButton = checkoutForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  bankTransferInstructions.hidden = true;
+  checkoutMessage.classList.remove("success");
+  checkoutMessage.textContent = "Đang tạo mã QR thanh toán...";
+
+  try {
+    const response = await fetch("/api/payments/vietqr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: total, orderCode }),
+    });
+    const payment = await response.json();
+    if (!response.ok) throw new Error(payment.error || "Không thể tạo mã QR.");
+    if (!bankPaymentOption.checked) return;
+
+    document.getElementById("bank-transfer-qr").src = payment.qrUrl;
+    document.getElementById("bank-transfer-bank").textContent = payment.bankId;
+    document.getElementById("bank-transfer-name").textContent = payment.accountName;
+    document.getElementById("bank-transfer-account").textContent = payment.accountNumber;
+    document.getElementById("bank-transfer-amount").textContent = formatPrice(payment.amount);
+    document.getElementById("bank-transfer-reference").textContent = payment.orderCode;
+    bankTransferInstructions.hidden = false;
+    checkoutMessage.textContent = "Mã thanh toán đã sẵn sàng.";
+    checkoutMessage.classList.add("success");
+    submitButton.textContent = "Đang chờ cửa hàng xác nhận";
+  } catch (error) {
+    if (bankPaymentOption.checked) {
+      checkoutMessage.textContent = error.message;
+      submitButton.disabled = false;
+    }
+  }
+}
+
+codPaymentOption.addEventListener("change", () => {
+  bankTransferInstructions.hidden = true;
+  checkoutMessage.textContent = "";
+  checkoutMessage.classList.remove("success");
+  const submitButton = checkoutForm.querySelector('button[type="submit"]');
+  submitButton.disabled = false;
+  submitButton.textContent = "Xác nhận đặt hàng";
+});
 
 categoryButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -326,15 +385,25 @@ document.addEventListener("click", (event) => {
 
   if (event.target.closest("#close-checkout") || event.target === checkoutModal) {
     closeCheckout();
+    return;
+  }
+
+  if (event.target.closest("#success-close")) {
+    closeCheckout();
   }
 });
 
-checkoutForm.addEventListener("submit", (event) => {
+checkoutForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (bankPaymentOption.checked) {
+    await createBankTransferQr();
+    return;
+  }
+
   const orderCode = `SL${Date.now().toString().slice(-6)}`;
-  checkoutMessage.textContent = `Đặt hàng thành công! Mã đơn hàng của bạn là ${orderCode}.`;
-  checkoutMessage.classList.add("success");
-  checkoutForm.querySelector('button[type="submit"]').disabled = true;
+  document.getElementById("success-order-code").textContent = orderCode;
+  checkoutForm.hidden = true;
+  checkoutSuccess.hidden = false;
   cart.length = 0;
   renderCart();
 });

@@ -1,0 +1,13 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "shoplite",
+	"main": "src/index.js",
+	"compatibility_date": "2026-09-28",
+	"d1_databases": [
+		{
+			"binding": "shoplite_db",
+			"database_name": "shoplite-db",
+			"database_id": "c35b7b08-75c4-47e7-8005-e3a48a14224d"
+		}
+	]
+}
