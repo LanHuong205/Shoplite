@@ -58,8 +58,12 @@ async function createSession(c, userId) {
   c.header('Set-Cookie', `shoplite_session=${token}; ${cookieOptions(c, SESSION_DURATION)}`)
 }
 
+function normalizeEmail(email) {
+  return email.trim().toLowerCase()
+}
+
 function validAccount(body, minimumPasswordLength = 8) {
-  const email = typeof body?.email === 'string' ? body.email.trim() : ''
+  const email = typeof body?.email === 'string' ? normalizeEmail(body.email) : ''
   return body && typeof body.name === 'string' && body.name.trim().length >= 2 && body.name.trim().length <= 100 &&
     email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
     typeof body.password === 'string' && body.password.length >= minimumPasswordLength && body.password.length <= 128
@@ -109,14 +113,21 @@ app.post('/api/auth/register', async (c) => {
   try { body = await c.req.json() } catch { return c.json({ error: 'Thông tin đăng ký không hợp lệ.' }, 400) }
   if (!validAccount(body)) return c.json({ error: 'Vui lòng nhập tên, email hợp lệ và mật khẩu có ít nhất 8 ký tự.' }, 400)
 
-  const email = body.email.trim().toLowerCase()
+  const email = normalizeEmail(body.email)
   try {
-    const passwordHash = await hashPassword(body.password)
-    const result = await c.env.shoplite_db.prepare(
-      "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'user')"
-    ).bind(body.name.trim(), email, passwordHash).run()
-    await createSession(c, result.meta.last_row_id)
-    return c.json({ user: { id: result.meta.last_row_id, name: body.name.trim(), email, role: 'user' } }, 201)
+    const name = body.name.trim()
+    const token = toHex(crypto.getRandomValues(new Uint8Array(32)))
+    const expiresAt = new Date(Date.now() + SESSION_DURATION * 1000).toISOString()
+    const [result] = await c.env.shoplite_db.batch([
+      c.env.shoplite_db.prepare(
+        "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'user')"
+      ).bind(name, email, await hashPassword(body.password)),
+      c.env.shoplite_db.prepare(
+        'INSERT INTO sessions (token_hash, user_id, expires_at) SELECT ?, id, ? FROM users WHERE email = ?'
+      ).bind(await digest(token), expiresAt, email)
+    ])
+    c.header('Set-Cookie', `shoplite_session=${token}; ${cookieOptions(c, SESSION_DURATION)}`)
+    return c.json({ user: { id: result.meta.last_row_id, name, email, role: 'user' } }, 201)
   } catch (error) {
     if (String(error).includes('UNIQUE')) return c.json({ error: 'Email này đã được đăng ký.' }, 409)
     throw error
@@ -130,7 +141,7 @@ app.post('/api/auth/login', async (c) => {
     return c.json({ error: 'Vui lòng nhập email và mật khẩu.' }, 400)
   }
   const user = await c.env.shoplite_db.prepare('SELECT id, name, email, role, password_hash FROM users WHERE email = ?')
-    .bind(body.email.trim().toLowerCase()).first()
+    .bind(normalizeEmail(body.email)).first()
   if (!user || !(await verifyPassword(body.password, user.password_hash))) {
     return c.json({ error: 'Email hoặc mật khẩu không chính xác.' }, 401)
   }
@@ -161,7 +172,7 @@ app.post('/api/auth/bootstrap-admin', async (c) => {
   let body
   try { body = await c.req.json() } catch { return c.json({ error: 'Thông tin khởi tạo không hợp lệ.' }, 400) }
   if (!validAccount(body, 12)) return c.json({ error: 'Mật khẩu admin cần ít nhất 12 ký tự.' }, 400)
-  const email = body.email.trim().toLowerCase()
+  const email = normalizeEmail(body.email)
   try {
     const result = await c.env.shoplite_db.prepare(
       "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'admin')"
