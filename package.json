@@ -4,7 +4,13 @@
   "description": "cửa hàng \r HELO",
   "main": "script.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "predev": "node scripts/prepare-assets.js",
+    "dev": "wrangler dev",
+    "predeploy": "node scripts/prepare-assets.js",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply shoplite-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply shoplite-db --remote",
+    "test": "node --check script.js && node --check src/index.js"
   },
   "repository": {
     "type": "git",

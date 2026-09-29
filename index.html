@@ -34,6 +34,7 @@
 
         <div class="header-actions">
           <button class="icon-button" aria-label="Tìm kiếm">⌕</button>
+          <button id="account-button" class="account-button" type="button">Đăng nhập</button>
           <button class="cart-button" aria-label="Giỏ hàng">
             Giỏ hàng
             <span id="cart-count" class="cart-count">0</span>
@@ -127,6 +128,36 @@
           </div>
 
           <div id="product-list" class="product-grid" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section id="admin-panel" class="section admin-panel" hidden>
+        <div class="container">
+          <div class="section-heading row-heading">
+            <div>
+              <p class="eyebrow">Quản trị</p>
+              <h2>Quản lý cửa hàng</h2>
+            </div>
+            <button id="new-product-button" class="btn btn-secondary" type="button">Thêm sách</button>
+          </div>
+          <form id="product-form" class="admin-product-form" hidden>
+            <input name="id" type="hidden" />
+            <label>Tên sách<input name="name" maxlength="160" required /></label>
+            <label>Tác giả<input name="author" maxlength="120" required /></label>
+            <label>Giá bán (đ)<input name="price" type="number" min="1" step="1000" required /></label>
+            <label>Tồn kho<input name="stock" type="number" min="0" step="1" required /></label>
+            <label>Danh mục<select name="category" required>
+              <option value="van-hoc">Văn học</option><option value="kinh-doanh">Kinh doanh</option>
+              <option value="giao-duc">Giáo dục</option><option value="thieu-nhi">Thiếu nhi</option>
+              <option value="ky-nang">Kỹ năng</option>
+            </select></label>
+            <label>Ảnh bìa (URL)<input name="image_url" type="url" maxlength="500" /></label>
+            <label class="admin-wide">Mô tả<textarea name="description" maxlength="2000" rows="3"></textarea></label>
+            <label class="admin-checkbox"><input name="featured" type="checkbox" /> Sách nổi bật</label>
+            <div class="admin-form-actions"><button class="btn btn-primary" type="submit">Lưu sách</button><button id="cancel-product-button" class="btn btn-secondary" type="button">Hủy</button></div>
+            <p id="admin-message" class="admin-message" role="status"></p>
+          </form>
+          <div id="admin-orders" class="admin-orders"></div>
         </div>
       </section>
 
@@ -237,6 +268,23 @@
       </div>
     </aside>
 
+    <div id="account-modal" class="modal-backdrop" aria-hidden="true">
+      <section class="checkout-modal account-modal" role="dialog" aria-modal="true" aria-labelledby="account-title">
+        <div class="checkout-header">
+          <div><p class="eyebrow">Shoplite</p><h2 id="account-title">Đăng nhập</h2></div>
+          <button id="close-account" class="close-cart" type="button" aria-label="Đóng đăng nhập">×</button>
+        </div>
+        <form id="account-form" class="checkout-form">
+          <label id="account-name-field" hidden>Họ và tên<input name="name" type="text" autocomplete="name" minlength="2" maxlength="100" /></label>
+          <label>Email<input name="email" type="email" autocomplete="email" required /></label>
+          <label>Mật khẩu<input name="password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required /></label>
+          <p id="account-message" class="checkout-message" role="status"></p>
+          <button id="account-submit" class="btn btn-primary full-width" type="submit">Đăng nhập</button>
+          <button id="account-mode-toggle" class="text-button" type="button">Tạo tài khoản khách hàng</button>
+        </form>
+      </section>
+    </div>
+
     <div id="checkout-modal" class="modal-backdrop" aria-hidden="true">
       <section class="checkout-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
         <div class="checkout-header">
@@ -298,7 +346,7 @@
         <section id="checkout-success" class="checkout-success" hidden aria-live="polite">
           <div class="success-mark" aria-hidden="true">✓</div>
           <h3>Đặt hàng thành công</h3>
-          <p>Shoplite đã tiếp nhận đơn hàng của bạn.</p>
+          <p id="success-payment-message">Shoplite đã tiếp nhận đơn hàng của bạn.</p>
           <p>Mã đơn hàng: <strong id="success-order-code"></strong></p>
           <button id="success-close" class="btn btn-primary full-width" type="button">Tiếp tục mua sắm</button>
         </section>

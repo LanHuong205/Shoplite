@@ -1,0 +1,6 @@
+ALTER TABLE orders ADD COLUMN customer_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE orders ADD COLUMN phone TEXT NOT NULL DEFAULT '';
+ALTER TABLE orders ADD COLUMN address TEXT NOT NULL DEFAULT '';
+ALTER TABLE orders ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'cod';
+ALTER TABLE orders ADD COLUMN order_code TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS orders_order_code_idx ON orders(order_code);

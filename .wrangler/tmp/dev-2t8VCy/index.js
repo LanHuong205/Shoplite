@@ -1813,12 +1813,175 @@ var Hono3 = class extends Hono {
 
 // src/index.js
 var app = new Hono3();
+var SESSION_DURATION = 7 * 24 * 60 * 60;
+var PASSWORD_ITERATIONS = 12e4;
+var encoder = new TextEncoder();
+function toHex(bytes) {
+  return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+__name(toHex, "toHex");
+function fromHex(value) {
+  return Uint8Array.from(value.match(/.{2}/g) || [], (byte) => parseInt(byte, 16));
+}
+__name(fromHex, "fromHex");
+async function digest(value) {
+  return toHex(await crypto.subtle.digest("SHA-256", encoder.encode(value)));
+}
+__name(digest, "digest");
+async function hashPassword(password, salt = crypto.getRandomValues(new Uint8Array(16))) {
+  const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const hash = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: PASSWORD_ITERATIONS }, key, 256);
+  return `pbkdf2$${PASSWORD_ITERATIONS}$${toHex(salt)}$${toHex(hash)}`;
+}
+__name(hashPassword, "hashPassword");
+async function verifyPassword(password, storedHash) {
+  const [, iterations, saltHex, expectedHex] = storedHash.split("$");
+  if (!iterations || !saltHex || !expectedHex) return false;
+  const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const actual = new Uint8Array(await crypto.subtle.deriveBits({
+    name: "PBKDF2",
+    hash: "SHA-256",
+    salt: fromHex(saltHex),
+    iterations: Number(iterations)
+  }, key, 256));
+  const expected = fromHex(expectedHex);
+  return actual.length === expected.length && actual.reduce((difference, byte, index) => difference | byte ^ expected[index], 0) === 0;
+}
+__name(verifyPassword, "verifyPassword");
+function cookieOptions(c, maxAge) {
+  const secure = new URL(c.req.url).protocol === "https:" ? "; Secure" : "";
+  return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+}
+__name(cookieOptions, "cookieOptions");
+async function getCurrentUser(c) {
+  const cookie = c.req.header("Cookie") || "";
+  const token = cookie.match(/(?:^|;\s*)shoplite_session=([a-f0-9]{64})(?:;|$)/)?.[1];
+  if (!token) return null;
+  const session = await c.env.shoplite_db.prepare(
+    "SELECT users.id, users.name, users.email, users.role FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?"
+  ).bind(await digest(token), (/* @__PURE__ */ new Date()).toISOString()).first();
+  return session || null;
+}
+__name(getCurrentUser, "getCurrentUser");
+async function createSession(c, userId) {
+  const token = toHex(crypto.getRandomValues(new Uint8Array(32)));
+  const expiresAt = new Date(Date.now() + SESSION_DURATION * 1e3).toISOString();
+  await c.env.shoplite_db.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").bind(await digest(token), userId, expiresAt).run();
+  c.header("Set-Cookie", `shoplite_session=${token}; ${cookieOptions(c, SESSION_DURATION)}`);
+}
+__name(createSession, "createSession");
+function validAccount(body, minimumPasswordLength = 8) {
+  const email = typeof body?.email === "string" ? body.email.trim() : "";
+  return body && typeof body.name === "string" && body.name.trim().length >= 2 && body.name.trim().length <= 100 && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && typeof body.password === "string" && body.password.length >= minimumPasswordLength && body.password.length <= 128;
+}
+__name(validAccount, "validAccount");
+function validProduct(body) {
+  return body && typeof body.name === "string" && body.name.trim().length > 0 && body.name.length <= 160 && typeof body.author === "string" && body.author.length <= 120 && typeof body.description === "string" && body.description.length <= 2e3 && Number.isSafeInteger(body.price) && body.price > 0 && typeof body.category === "string" && body.category.length <= 80 && Number.isSafeInteger(body.stock) && body.stock >= 0 && typeof body.featured === "boolean" && (body.image_url == null || typeof body.image_url === "string" && body.image_url.length <= 500);
+}
+__name(validProduct, "validProduct");
+function buildVietQrDetails(env, amount, orderCode) {
+  const { BANK_ID, BANK_ACCOUNT, BANK_ACCOUNT_NAME } = env;
+  const qrUrl = new URL(`https://img.vietqr.io/image/${encodeURIComponent(BANK_ID)}-${encodeURIComponent(BANK_ACCOUNT)}-compact2.png`);
+  qrUrl.search = new URLSearchParams({ amount: String(amount), addInfo: orderCode, accountName: BANK_ACCOUNT_NAME }).toString();
+  return {
+    bankId: BANK_ID,
+    accountNumber: BANK_ACCOUNT,
+    accountName: BANK_ACCOUNT_NAME,
+    amount,
+    orderCode,
+    qrUrl: qrUrl.toString()
+  };
+}
+__name(buildVietQrDetails, "buildVietQrDetails");
+async function requireAdmin(c) {
+  const user = await getCurrentUser(c);
+  if (!user) return c.json({ error: "Vui l\xF2ng \u0111\u0103ng nh\u1EADp." }, 401);
+  if (user.role !== "admin") return c.json({ error: "B\u1EA1n kh\xF4ng c\xF3 quy\u1EC1n th\u1EF1c hi\u1EC7n thao t\xE1c n\xE0y." }, 403);
+  return null;
+}
+__name(requireAdmin, "requireAdmin");
 app.get("/api", (c) => {
   return c.json({
     message: "Shoplite API \u0111ang ho\u1EA1t \u0111\u1ED9ng!"
   });
 });
+app.post("/api/auth/register", async (c) => {
+  let body;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Th\xF4ng tin \u0111\u0103ng k\xFD kh\xF4ng h\u1EE3p l\u1EC7." }, 400);
+  }
+  if (!validAccount(body)) return c.json({ error: "Vui l\xF2ng nh\u1EADp t\xEAn, email h\u1EE3p l\u1EC7 v\xE0 m\u1EADt kh\u1EA9u c\xF3 \xEDt nh\u1EA5t 8 k\xFD t\u1EF1." }, 400);
+  const email = body.email.trim().toLowerCase();
+  try {
+    const passwordHash = await hashPassword(body.password);
+    const result = await c.env.shoplite_db.prepare(
+      "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'user')"
+    ).bind(body.name.trim(), email, passwordHash).run();
+    await createSession(c, result.meta.last_row_id);
+    return c.json({ user: { id: result.meta.last_row_id, name: body.name.trim(), email, role: "user" } }, 201);
+  } catch (error) {
+    if (String(error).includes("UNIQUE")) return c.json({ error: "Email n\xE0y \u0111\xE3 \u0111\u01B0\u1EE3c \u0111\u0103ng k\xFD." }, 409);
+    throw error;
+  }
+});
+app.post("/api/auth/login", async (c) => {
+  let body;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Th\xF4ng tin \u0111\u0103ng nh\u1EADp kh\xF4ng h\u1EE3p l\u1EC7." }, 400);
+  }
+  if (!body || typeof body.email !== "string" || typeof body.password !== "string") {
+    return c.json({ error: "Vui l\xF2ng nh\u1EADp email v\xE0 m\u1EADt kh\u1EA9u." }, 400);
+  }
+  const user = await c.env.shoplite_db.prepare("SELECT id, name, email, role, password_hash FROM users WHERE email = ?").bind(body.email.trim().toLowerCase()).first();
+  if (!user || !await verifyPassword(body.password, user.password_hash)) {
+    return c.json({ error: "Email ho\u1EB7c m\u1EADt kh\u1EA9u kh\xF4ng ch\xEDnh x\xE1c." }, 401);
+  }
+  await createSession(c, user.id);
+  return c.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+});
+app.post("/api/auth/logout", async (c) => {
+  const user = await getCurrentUser(c);
+  const token = (c.req.header("Cookie") || "").match(/(?:^|;\s*)shoplite_session=([a-f0-9]{64})(?:;|$)/)?.[1];
+  if (user && token) {
+    await c.env.shoplite_db.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await digest(token)).run();
+  }
+  c.header("Set-Cookie", `shoplite_session=; ${cookieOptions(c, 0)}`);
+  return c.json({ ok: true });
+});
+app.get("/api/auth/me", async (c) => c.json({ user: await getCurrentUser(c) }));
+app.post("/api/auth/bootstrap-admin", async (c) => {
+  const setupToken = c.req.header("X-Admin-Setup-Token") || "";
+  if (!c.env.ADMIN_SETUP_TOKEN || setupToken !== c.env.ADMIN_SETUP_TOKEN) {
+    return c.json({ error: "M\xE3 kh\u1EDFi t\u1EA1o qu\u1EA3n tr\u1ECB kh\xF4ng h\u1EE3p l\u1EC7." }, 403);
+  }
+  const existingAdmin = await c.env.shoplite_db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").first();
+  if (existingAdmin) return c.json({ error: "T\xE0i kho\u1EA3n qu\u1EA3n tr\u1ECB \u0111\xE3 \u0111\u01B0\u1EE3c kh\u1EDFi t\u1EA1o." }, 409);
+  let body;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Th\xF4ng tin kh\u1EDFi t\u1EA1o kh\xF4ng h\u1EE3p l\u1EC7." }, 400);
+  }
+  if (!validAccount(body, 12)) return c.json({ error: "M\u1EADt kh\u1EA9u admin c\u1EA7n \xEDt nh\u1EA5t 12 k\xFD t\u1EF1." }, 400);
+  const email = body.email.trim().toLowerCase();
+  try {
+    const result = await c.env.shoplite_db.prepare(
+      "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'admin')"
+    ).bind(body.name.trim(), email, await hashPassword(body.password)).run();
+    await createSession(c, result.meta.last_row_id);
+    return c.json({ user: { id: result.meta.last_row_id, name: body.name.trim(), email, role: "admin" } }, 201);
+  } catch (error) {
+    if (String(error).includes("UNIQUE")) return c.json({ error: "Email n\xE0y \u0111\xE3 \u0111\u01B0\u1EE3c \u0111\u0103ng k\xFD." }, 409);
+    throw error;
+  }
+});
 app.post("/api/payments/vietqr", async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user) return c.json({ error: "Vui l\xF2ng \u0111\u0103ng nh\u1EADp \u0111\u1EC3 thanh to\xE1n \u0111\u01A1n h\xE0ng." }, 401);
   const { BANK_ID, BANK_ACCOUNT, BANK_ACCOUNT_NAME } = c.env;
   if (!BANK_ID || !BANK_ACCOUNT || !BANK_ACCOUNT_NAME) {
     return c.json({ error: "C\u1EEDa h\xE0ng ch\u01B0a c\u1EA5u h\xECnh t\xE0i kho\u1EA3n nh\u1EADn chuy\u1EC3n kho\u1EA3n." }, 503);
@@ -1834,24 +1997,152 @@ app.post("/api/payments/vietqr", async (c) => {
   if (!Number.isSafeInteger(amount) || amount <= 0 || !/^SL[A-Z0-9]{6,12}$/.test(orderCode)) {
     return c.json({ error: "S\u1ED1 ti\u1EC1n ho\u1EB7c m\xE3 \u0111\u01A1n h\xE0ng kh\xF4ng h\u1EE3p l\u1EC7." }, 400);
   }
-  const qrUrl = new URL(`https://img.vietqr.io/image/${encodeURIComponent(BANK_ID)}-${encodeURIComponent(BANK_ACCOUNT)}-compact2.png`);
-  qrUrl.search = new URLSearchParams({
-    amount: String(amount),
-    addInfo: orderCode,
-    accountName: BANK_ACCOUNT_NAME
-  }).toString();
-  return c.json({
-    bankId: BANK_ID,
-    accountNumber: BANK_ACCOUNT,
-    accountName: BANK_ACCOUNT_NAME,
-    amount,
-    orderCode,
-    qrUrl: qrUrl.toString()
-  });
+  const order2 = await c.env.shoplite_db.prepare(
+    "SELECT total_amount FROM orders WHERE order_code = ? AND user_id = ? AND payment_method = 'bank' AND status = 'pending'"
+  ).bind(orderCode, user.id).first();
+  if (!order2 || order2.total_amount !== amount) {
+    return c.json({ error: "Kh\xF4ng t\xECm th\u1EA5y \u0111\u01A1n chuy\u1EC3n kho\u1EA3n h\u1EE3p l\u1EC7." }, 404);
+  }
+  return c.json(buildVietQrDetails(c.env, amount, orderCode));
 });
 app.get("/api/products", async (c) => {
-  const { results } = await c.env.shoplite_db.prepare("SELECT * FROM products ORDER BY id DESC").all();
+  const { results } = await c.env.shoplite_db.prepare("SELECT id, name, author, description, price, image_url, category, stock, featured FROM products ORDER BY id DESC").all();
   return c.json(results);
+});
+app.post("/api/products", async (c) => {
+  const denied = await requireAdmin(c);
+  if (denied) return denied;
+  let body;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Th\xF4ng tin s\xE1ch kh\xF4ng h\u1EE3p l\u1EC7." }, 400);
+  }
+  if (!validProduct(body)) return c.json({ error: "Vui l\xF2ng ki\u1EC3m tra l\u1EA1i th\xF4ng tin s\xE1ch." }, 400);
+  const result = await c.env.shoplite_db.prepare(
+    "INSERT INTO products (name, author, description, price, image_url, category, stock, featured) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(body.name.trim(), body.author.trim(), body.description.trim(), body.price, body.image_url || null, body.category, body.stock, body.featured ? 1 : 0).run();
+  return c.json({ id: result.meta.last_row_id }, 201);
+});
+app.patch("/api/products/:id", async (c) => {
+  const denied = await requireAdmin(c);
+  if (denied) return denied;
+  let body;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Th\xF4ng tin s\xE1ch kh\xF4ng h\u1EE3p l\u1EC7." }, 400);
+  }
+  if (!validProduct(body)) return c.json({ error: "Vui l\xF2ng ki\u1EC3m tra l\u1EA1i th\xF4ng tin s\xE1ch." }, 400);
+  const result = await c.env.shoplite_db.prepare(
+    "UPDATE products SET name = ?, author = ?, description = ?, price = ?, image_url = ?, category = ?, stock = ?, featured = ? WHERE id = ?"
+  ).bind(body.name.trim(), body.author.trim(), body.description.trim(), body.price, body.image_url || null, body.category, body.stock, body.featured ? 1 : 0, c.req.param("id")).run();
+  if (!result.meta.changes) return c.json({ error: "Kh\xF4ng t\xECm th\u1EA5y s\xE1ch." }, 404);
+  return c.json({ ok: true });
+});
+app.delete("/api/products/:id", async (c) => {
+  const denied = await requireAdmin(c);
+  if (denied) return denied;
+  const result = await c.env.shoplite_db.prepare("DELETE FROM products WHERE id = ?").bind(c.req.param("id")).run();
+  if (!result.meta.changes) return c.json({ error: "Kh\xF4ng t\xECm th\u1EA5y s\xE1ch." }, 404);
+  return c.json({ ok: true });
+});
+app.post("/api/orders", async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user) return c.json({ error: "Vui l\xF2ng \u0111\u0103ng nh\u1EADp b\u1EB1ng t\xE0i kho\u1EA3n kh\xE1ch h\xE0ng \u0111\u1EC3 \u0111\u1EB7t h\xE0ng." }, 401);
+  if (user.role !== "user") return c.json({ error: "Ch\u1EC9 t\xE0i kho\u1EA3n kh\xE1ch h\xE0ng m\u1EDBi \u0111\u01B0\u1EE3c \u0111\u1EB7t h\xE0ng." }, 403);
+  let body;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Th\xF4ng tin \u0111\u01A1n h\xE0ng kh\xF4ng h\u1EE3p l\u1EC7." }, 400);
+  }
+  if (!body || typeof body.fullName !== "string" || body.fullName.trim().length < 2 || body.fullName.length > 120 || typeof body.phone !== "string" || !/^[0-9 +()-]{9,20}$/.test(body.phone) || typeof body.address !== "string" || body.address.trim().length < 6 || body.address.length > 500 || !["cod", "bank"].includes(body.payment) || !Array.isArray(body.items) || body.items.length === 0 || body.items.length > 50) {
+    return c.json({ error: "Vui l\xF2ng ki\u1EC3m tra l\u1EA1i th\xF4ng tin giao h\xE0ng v\xE0 s\u1EA3n ph\u1EA9m." }, 400);
+  }
+  if (body.payment === "bank" && (!c.env.BANK_ID || !c.env.BANK_ACCOUNT || !c.env.BANK_ACCOUNT_NAME)) {
+    return c.json({ error: "C\u1EEDa h\xE0ng ch\u01B0a c\u1EA5u h\xECnh thanh to\xE1n QR. \u0110\u01A1n h\xE0ng ch\u01B0a \u0111\u01B0\u1EE3c t\u1EA1o." }, 503);
+  }
+  const quantities = /* @__PURE__ */ new Map();
+  for (const item of body.items) {
+    if (!Number.isSafeInteger(item.id) || !Number.isSafeInteger(item.quantity) || item.quantity < 1 || item.quantity > 99) {
+      return c.json({ error: "S\u1ED1 l\u01B0\u1EE3ng s\xE1ch kh\xF4ng h\u1EE3p l\u1EC7." }, 400);
+    }
+    quantities.set(item.id, (quantities.get(item.id) || 0) + item.quantity);
+  }
+  const ids = [...quantities.keys()];
+  const placeholders = ids.map(() => "?").join(", ");
+  const { results: books } = await c.env.shoplite_db.prepare(
+    `SELECT id, name, price, stock FROM products WHERE id IN (${placeholders})`
+  ).bind(...ids).all();
+  if (books.length !== ids.length) return c.json({ error: "M\u1ED9t ho\u1EB7c nhi\u1EC1u s\xE1ch kh\xF4ng c\xF2n t\u1ED3n t\u1EA1i." }, 409);
+  for (const book of books) {
+    if (book.stock < quantities.get(book.id)) return c.json({ error: `S\xE1ch "${book.name}" kh\xF4ng \u0111\u1EE7 s\u1ED1 l\u01B0\u1EE3ng trong kho.` }, 409);
+  }
+  const subtotal = books.reduce((sum, book) => sum + book.price * quantities.get(book.id), 0);
+  const shipping = subtotal === 0 || subtotal >= 3e5 ? 0 : 3e4;
+  const orderCode = `SL${crypto.randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`;
+  const total = subtotal + shipping;
+  const paymentStatus = body.payment === "bank" ? "awaiting_payment" : "cash_on_delivery";
+  const paymentDetails = body.payment === "bank" ? buildVietQrDetails(c.env, total, orderCode) : null;
+  const statements = [
+    c.env.shoplite_db.prepare(
+      "INSERT INTO orders (user_id, total_amount, status, customer_name, phone, address, payment_method, payment_status, order_code) VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?)"
+    ).bind(user.id, total, body.fullName.trim(), body.phone.trim(), body.address.trim(), body.payment, paymentStatus, orderCode)
+  ];
+  for (const book of books) {
+    const quantity = quantities.get(book.id);
+    statements.push(c.env.shoplite_db.prepare(
+      "UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?"
+    ).bind(quantity, book.id, quantity));
+    statements.push(c.env.shoplite_db.prepare(
+      "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ((SELECT id FROM orders WHERE order_code = ?), ?, ?, ?)"
+    ).bind(orderCode, book.id, quantity, book.price));
+  }
+  await c.env.shoplite_db.batch(statements);
+  return c.json({ orderCode, subtotal, shipping, total, paymentStatus, payment: paymentDetails }, 201);
+});
+app.get("/api/orders", async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user) return c.json({ error: "Vui l\xF2ng \u0111\u0103ng nh\u1EADp." }, 401);
+  const isAdmin = user.role === "admin";
+  const { results } = await c.env.shoplite_db.prepare(
+    `SELECT orders.id, orders.order_code, orders.total_amount, orders.status, orders.payment_method, orders.payment_status,
+      orders.customer_name, orders.phone, orders.address, orders.created_at, users.name AS account_name,
+      GROUP_CONCAT(products.name || ' x' || order_items.quantity, ', ') AS items
+      FROM orders JOIN users ON users.id = orders.user_id
+      JOIN order_items ON order_items.order_id = orders.id
+      JOIN products ON products.id = order_items.product_id
+      ${isAdmin ? "" : "WHERE orders.user_id = ?"}
+      GROUP BY orders.id ORDER BY orders.id DESC LIMIT 100`
+  ).bind(...isAdmin ? [] : [user.id]).all();
+  return c.json(results);
+});
+app.patch("/api/orders/:id", async (c) => {
+  const denied = await requireAdmin(c);
+  if (denied) return denied;
+  let body;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Th\xF4ng tin tr\u1EA1ng th\xE1i kh\xF4ng h\u1EE3p l\u1EC7." }, 400);
+  }
+  const order2 = await c.env.shoplite_db.prepare("SELECT status, payment_method, payment_status FROM orders WHERE id = ?").bind(c.req.param("id")).first();
+  if (!order2) return c.json({ error: "Kh\xF4ng t\xECm th\u1EA5y \u0111\u01A1n h\xE0ng." }, 404);
+  if (body.status !== void 0 && !["pending", "processing", "shipped", "completed", "cancelled"].includes(body.status)) {
+    return c.json({ error: "Tr\u1EA1ng th\xE1i \u0111\u01A1n h\xE0ng kh\xF4ng h\u1EE3p l\u1EC7." }, 400);
+  }
+  if (body.paymentStatus !== void 0) {
+    const validStatuses = order2.payment_method === "bank" ? ["awaiting_payment", "paid", "cancelled"] : ["cash_on_delivery", "paid", "cancelled"];
+    if (!validStatuses.includes(body.paymentStatus)) return c.json({ error: "Tr\u1EA1ng th\xE1i thanh to\xE1n kh\xF4ng h\u1EE3p l\u1EC7." }, 400);
+  }
+  if (body.status === void 0 && body.paymentStatus === void 0) {
+    return c.json({ error: "C\u1EA7n cung c\u1EA5p tr\u1EA1ng th\xE1i \u0111\u01A1n h\xE0ng ho\u1EB7c thanh to\xE1n." }, 400);
+  }
+  await c.env.shoplite_db.prepare(
+    "UPDATE orders SET status = COALESCE(?, status), payment_status = COALESCE(?, payment_status) WHERE id = ?"
+  ).bind(body.status ?? null, body.paymentStatus ?? null, c.req.param("id")).run();
+  return c.json({ ok: true });
 });
 var src_default = app;
 
@@ -1902,7 +2193,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// .wrangler/tmp/bundle-UT8veh/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-zGCAtC/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -1934,7 +2225,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-UT8veh/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-zGCAtC/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
