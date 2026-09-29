@@ -6,7 +6,7 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-# Diagnostic reports (https://nodejs.org/api/report.html)
+# Diagnostic reports
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Runtime data
@@ -25,29 +25,29 @@ coverage
 # nyc test coverage
 .nyc_output
 
-# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+# Grunt intermediate storage
 .grunt
 
-# Bower dependency directory (https://bower.io/)
+# Bower dependency directory
 bower_components
 
-# node-waf configuration
+# Node-waf configuration
 .lock-wscript
 
-# Compiled binary addons (https://nodejs.org/api/addons.html)
+# Compiled binary addons
 build/Release
 
 # Dependency directories
 node_modules/
 jspm_packages/
 
-# Snowpack dependency directory (https://snowpack.dev/)
+# Snowpack dependency directory
 web_modules/
 
 # TypeScript cache
 *.tsbuildinfo
 
-# Optional npm cache directory
+# Optional npm cache
 .npm
 
 # Optional eslint cache
@@ -59,7 +59,7 @@ web_modules/
 # Optional REPL history
 .node_repl_history
 
-# Output of 'npm pack'
+# Output of npm pack
 *.tgz
 
 # Yarn Integrity file
@@ -71,7 +71,10 @@ web_modules/
 !.env.example
 .dev.vars*
 
-# parcel-bundler cache (https://parceljs.org/)
+# Cloudflare Wrangler
+.wrangler/
+
+# Parcel cache
 .cache
 .parcel-cache
 
@@ -81,56 +84,59 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
+
+# Build output
 dist
-public/
+
+# Gatsby cache
+.cache/
+
+# Gatsby generated output
+public/cache/
+
+# Output
 .output
 
-# Gatsby files
-.cache/
-# Comment in the public line in if your project uses Gatsby and not Next.js
-# https://nextjs.org/blog/next-9-1#public-directory-support
-# public
-
-# vuepress build output
+# VuePress
 .vuepress/dist
 
-# vuepress v2.x temp directory
+# VuePress v2 temp
 .temp
 
-# Sveltekit cache directory
+# SvelteKit
 .svelte-kit/
 
-# vitepress build output
+# VitePress
 **/.vitepress/dist
 
-# vitepress cache directory
+# VitePress cache
 **/.vitepress/cache
 
-# Docusaurus cache and generated files
+# Docusaurus
 .docusaurus
 
-# Serverless directories
+# Serverless
 .serverless/
 
-# FuseBox cache
+# FuseBox
 .fusebox/
 
-# DynamoDB Local files
+# DynamoDB Local
 .dynamodb/
 
-# Firebase cache directory
+# Firebase cache
 .firebase/
 
-# TernJS port file
+# TernJS
 .tern-port
 
-# Stores VSCode versions used for testing VSCode extensions
+# VSCode test versions
 .vscode-test
 
 # pnpm
 .pnpm-store
 
-# yarn v3
+# Yarn v3
 .pnp.*
 .yarn/*
 !.yarn/patches
